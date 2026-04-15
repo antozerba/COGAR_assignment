@@ -17,3 +17,6 @@ Software needed: MuJoCo, Python, unitree_mujoco, unitree_rl_mjlab, plotting and 
 Research needed: Bipedal locomotion for humanoid robots, walking control theory, contact-aware control, reinforcement learning for humanoid locomotion, Unitree G1 EDU documentation
 Deliverables: Working G1 EDU walking simulation in MuJoCo, locomotion controller implementation, benchmark experiments, stability analysis report, demo videos
 
+# Stating point:
+- The robot Unitree G1 29 degrees of freedom (DOF) (https://github.com/unitreerobotics/unitree_mujoco).
+- 3D LIDAR (LIVOX-MID360) + Depth Camera Intel RealSense (D435i)
