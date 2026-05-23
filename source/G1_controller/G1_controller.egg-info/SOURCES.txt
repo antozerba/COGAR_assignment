@@ -1,0 +1,10 @@
+pyproject.toml
+setup.py
+G1_controller/__init__.py
+G1_controller/ui_extension_example.py
+G1_controller.egg-info/PKG-INFO
+G1_controller.egg-info/SOURCES.txt
+G1_controller.egg-info/dependency_links.txt
+G1_controller.egg-info/not-zip-safe
+G1_controller.egg-info/requires.txt
+G1_controller.egg-info/top_level.txt

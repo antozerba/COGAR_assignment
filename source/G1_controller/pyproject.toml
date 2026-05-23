@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools<82.0.0", "wheel", "toml"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyright]
+pythonPath = "/isaac-sim/kit/python/bin/python3"
+extraPaths = [
+    "./source/G1_controller",
+    "/isaac-sim/kit/python/lib/python3.11/site-packages"
+]
