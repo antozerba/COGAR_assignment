@@ -1,6 +1,3 @@
-# Copyright (c) 2022-2026, The Isaac Lab Project Developers
-# SPDX-License-Identifier: BSD-3-Clause
-
 """Configuration for G1 humanoid locomotion task (walk forward)."""
 
 import math
@@ -115,15 +112,7 @@ class ActionsCfg:
 
     joint_pos = JointPositionActionCfg(
         asset_name="robot",
-        joint_names=[
-            ".*_hip_yaw_joint",
-            ".*_hip_roll_joint",
-            ".*_hip_pitch_joint",
-            ".*_knee_joint",
-            ".*_ankle_pitch_joint",
-            ".*_ankle_roll_joint",
-            "torso_joint",
-        ],
+        joint_names=[".*"],
         scale=0.5,
         use_default_offset=True,
     )
@@ -222,7 +211,7 @@ class RewardsCfg:
     # Keep torso upright
     flat_orientation = RewTerm(
         func=flat_orientation_l2,
-        weight=-5.0,
+        weight=-1.0,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
@@ -233,13 +222,21 @@ class RewardsCfg:
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
+    # to avoid waist rotation
+    ang_vel_z = RewTerm(
+        func=mdp.ang_vel_z_l2,
+        weight=-1.0,    
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
   
 
     # Smooth actions
     action_rate = RewTerm(func=action_rate_l2, weight=-0.01)
 
     # Failure penalty
-    terminating = RewTerm(func=is_terminated, weight=-10.0)
+    terminating = RewTerm(func=is_terminated, weight=-2.0)
+
 
 
 @configclass
@@ -250,7 +247,7 @@ class TerminationsCfg:
 
     bad_orientation = DoneTerm(
         func=bad_orientation,
-        params={"limit_angle": math.radians(60)},
+        params={"limit_angle": math.radians(80)},
     )
 
     base_height = DoneTerm(
@@ -268,7 +265,7 @@ class TerminationsCfg:
 
 
 @configclass
-class G1ControllerEnvCfg(ManagerBasedRLEnvCfg):
+class G1_23dof_ControllerEnvCfg(ManagerBasedRLEnvCfg):
     """Full environment configuration for G1 forward locomotion."""
 
     scene: G1ControllerSceneCfg = G1ControllerSceneCfg(num_envs=4096, env_spacing=2.5)
