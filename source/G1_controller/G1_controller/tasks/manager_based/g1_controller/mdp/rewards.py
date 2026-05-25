@@ -25,7 +25,7 @@ def joint_pos_target_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> to
     # wrap the joint positions to (-pi, pi)
     joint_pos = wrap_to_pi(asset.data.joint_pos[:, asset_cfg.joint_ids])
     # compute the reward
-    return torch.sum(torch.square(joint_pos - target), dim=1)
+    return torch.mean(torch.square(joint_pos - target), dim=1)
 
 def ang_vel_z_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]

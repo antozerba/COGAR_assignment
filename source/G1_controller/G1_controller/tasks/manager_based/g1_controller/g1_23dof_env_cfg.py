@@ -46,9 +46,12 @@ from isaaclab.envs.mdp import (
     time_out,
     bad_orientation,
     root_height_below_minimum,
+
+    base_height_l2,  # Aggiunta per il reward di altezza del torso
 )
 
 from . import mdp
+
 
 
 ##
@@ -99,7 +102,7 @@ class CommandsCfg:
         rel_heading_envs=0.0,
         heading_command=False,
         ranges=UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.5, 0.5),   # sempre 0.5 m/s in avanti
+            lin_vel_x=(0.2, 0.2),   # sempre 0.5 m/s in avanti
             lin_vel_y=(0.0, 0.0),   # no movimento laterale
             ang_vel_z=(0.0, 0.0),   # no rotazione
         ),
@@ -177,6 +180,87 @@ class EventCfg:
             "velocity_range": (-0.1, 0.1),
         },
     )
+@configclass
+class RewardStabilityCfg:
+    """Reward terms for stable standing."""
+    # Smooth actions
+    action_rate = RewTerm(func=action_rate_l2, weight=-0.01)
+
+    # Failure penalty
+    terminating = RewTerm(func=is_terminated, weight=-2.0)
+    
+    # Stay alive
+    alive = RewTerm(func=is_alive, weight=0.15)
+
+    # Primary: walk forward at target velocity
+    forward_velocity = RewTerm(
+        func=track_lin_vel_xy_exp, 
+        weight=1.2,
+        params={"command_name": "base_velocity", "std": 0.25}, 
+        #prende la v_d dal comando per fare V_reale - V_desired e setta la standard deviation per exponential in track_lin_vel_xy_exp
+    )
+
+    # Penalise vertical base velocity (no bouncing)
+    lin_vel_z = RewTerm(
+        func=lin_vel_z_l2,
+        weight=-2.0,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+    # HORIZOTNAL ANG VEL Penalise rolling/pitching of the base, keep the robot up right
+    ang_vel_xy = RewTerm(
+        func=ang_vel_xy_l2,
+        weight=-0.05,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    # ORIENTATION DEVIATION Keep torso upright, torso inclination 
+    flat_orientation = RewTerm(
+        func=flat_orientation_l2,
+        weight=-1.0,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    #BASE HEIGHT PENALTY  tende a mantenere il torso del robot all'altezza target nominale
+    base_height = RewTerm(
+        func=base_height_l2, # o root_height_l2 a seconda dell'esatta funzione Isaac Lab
+        weight=-3.0,            # paper -10 
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "target_height": 0.74, # Altezza nominale del torso (es. per Unitree G1)
+        },
+    )
+
+    # DOF velocity penalty, penalise strong joint acc 
+    joint_vel = RewTerm(
+        func=joint_vel_l1,
+        weight=-0.001,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+
+    # HIP-pose DEVATION , to avoid waist rotation
+    ang_vel_z = RewTerm(
+        func=mdp.ang_vel_z_l2,
+        weight=-1.0,    
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    # Tieni braccia ferme
+    joint_pos_arms = RewTerm(
+        func=mdp.joint_pos_target_l2,
+        weight=-0.5,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[".*_shoulder_.*", ".*_elbow.*"]
+            )
+        },
+    )
+
+
+
+
+
 
 
 @configclass
@@ -186,56 +270,88 @@ class RewardsCfg:
     # Primary: walk forward at target velocity
     forward_velocity = RewTerm(
         func=track_lin_vel_xy_exp, 
-        weight=2.0,
+        weight=1.2,
         params={"command_name": "base_velocity", "std": 0.25}, 
         #prende la v_d dal comando per fare V_reale - V_desired e setta la standard deviation per exponential in track_lin_vel_xy_exp
     )
 
-    # Stay alive
-    alive = RewTerm(func=is_alive, weight=0.5)
 
-    # Penalise vertical base velocity (no bouncing)
-    lin_vel_z = RewTerm(
-        func=lin_vel_z_l2,
-        weight=-0.5,
-        params={"asset_cfg": SceneEntityCfg("robot")},
-    )
 
-    # Penalise rolling/pitching of the base
-    ang_vel_xy = RewTerm(
-        func=ang_vel_xy_l2,
-        weight=-0.05,
-        params={"asset_cfg": SceneEntityCfg("robot")},
-    )
+    # # Min. torso ang. vel:  termine di regolarità/smoothness del torso
+    # torso_ang_vel_reg = RewTerm(
+    #     func=mdp.torso_angular_velocity_tracking,
+    #     weight=2.0,
+    #     params={"asset_cfg": SceneEntityCfg("robot")},
+    # )
 
-    # Keep torso upright
-    flat_orientation = RewTerm(
-        func=flat_orientation_l2,
-        weight=-1.0,
-        params={"asset_cfg": SceneEntityCfg("robot")},
-    )
+    # # Waist deviations (Deviazioni del bacino/vita rispetto al target): 1.0 ciascuno
+    # waist_pitch = RewTerm(func=mdp.waist_pitch_deviation, weight=1.0)
+    # waist_roll = RewTerm(func=mdp.waist_roll_deviation, weight=1.0)
+    # waist_yaw = RewTerm(func=mdp.waist_yaw_deviation, weight=1.0)
 
-    # Energy efficiency
-    joint_vel = RewTerm(
-        func=joint_vel_l1,
-        weight=-0.001,
-        params={"asset_cfg": SceneEntityCfg("robot")},
-    )
+    # # Torso yaw smoothness: 0.8
+    # torso_yaw_smoothness = RewTerm(func=mdp.torso_yaw_smoothness, weight=0.8)
 
-    # to avoid waist rotation
-    ang_vel_z = RewTerm(
-        func=mdp.ang_vel_z_l2,
-        weight=-1.0,    
-        params={"asset_cfg": SceneEntityCfg("robot")},
-    )
+    # # Shoulder roll control: 3.0
+    # shoulder_roll = RewTerm(func=mdp.shoulder_roll_control, weight=3.0)
 
-  
+    # # =========================================================================
+    # # HUMAN-LIKE ARM SWING (Stile naturale delle braccia - Sempre attivo)
+    # # =========================================================================
+    
+    # # Arm-leg momentum balance (Bilanciamento del momento braccia-gambe): 5.0
+    # arm_leg_momentum = RewTerm(func=mdp.arm_leg_momentum_balance, weight=5.0)
 
-    # Smooth actions
-    action_rate = RewTerm(func=action_rate_l2, weight=-0.01)
+    # # Human-like arm swing energy: 0.3
+    # arm_swing_energy = RewTerm(func=mdp.arm_swing_energy, weight=0.3)
 
-    # Failure penalty
-    terminating = RewTerm(func=is_terminated, weight=-2.0)
+    # # Elbow phase tracking (Tracciamento della fase del gomito rispetto al passo): 2.5
+    # elbow_phase = RewTerm(func=mdp.elbow_phase_tracking, weight=2.5)
+
+    # # Arm swing symmetry: 2.0
+    # arm_swing_symmetry = RewTerm(func=mdp.arm_swing_symmetry, weight=2.0)
+
+    # # Arm swing-leg amp. match (Accoppiamento ampiezza braccia-gambe): 1.0
+    # arm_leg_amplitude_match = RewTerm(func=mdp.arm_leg_amplitude_match, weight=1.0)
+
+
+    # # =========================================================================
+    # # 2. WALKING-SPECIFIC REWARDS (Attivi solo con Gait ID = Walking)
+    # # =========================================================================
+    
+    # # Feet swing height penalty: -15.0
+    # # Penalizza se i piedi si alzano troppo o troppo poco rispetto alla traiettoria ideale
+    # feet_swing_height = RewTerm(
+    #     func=mdp.feet_swing_height_penalty,
+    #     weight=-15.0,
+    #     params={"asset_cfg": SceneEntityCfg("robot"), "gait_id_target": 1} 
+    #     # Passiamo 'gait_id_target': la funzione azzererà il reward se l'ambiente non è in modalità Walking
+    # )
+
+    # # Contact (Walking contact consistency): 1.0
+    # # Premia il contatto alternato corretto dei piedi durante la camminata
+    # walking_contact = RewTerm(
+    #     func=mdp.walking_contact_pattern,
+    #     weight=1.0,
+    #     params={"asset_cfg": SceneEntityCfg("robot"), "gait_id_target": 1}
+    # )
+
+    # # Straight knee (Ginocchia tese nella fase di appoggio): 0.1
+    # # Questo è il termine cruciale del paper per evitare che l'umanoide cammini "accovacciato"
+    # straight_knee = RewTerm(
+    #     func=mdp.straight_knee_bonus,
+    #     weight=0.1,
+    #     params={"asset_cfg": SceneEntityCfg("robot"), "gait_id_target": 1}
+    # )
+
+    # # Feet drag penalty (Penalità se trascina i piedi a terra): -0.5
+    # feet_drag = RewTerm(
+    #     func=mdp.feet_drag_penalty,
+    #     weight=-0.5,
+    #     params={"asset_cfg": SceneEntityCfg("robot"), "gait_id_target": 1}
+    # )
+    
+
 
 
 
@@ -273,7 +389,8 @@ class G1_23dof_ControllerEnvCfg(ManagerBasedRLEnvCfg):
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()  
     events: EventCfg = EventCfg()
-    rewards: RewardsCfg = RewardsCfg()
+    # rewards: RewardsCfg = RewardsCfg()
+    rewards: RewardStabilityCfg = RewardStabilityCfg()
     terminations: TerminationsCfg = TerminationsCfg()
 
     def __post_init__(self) -> None:
