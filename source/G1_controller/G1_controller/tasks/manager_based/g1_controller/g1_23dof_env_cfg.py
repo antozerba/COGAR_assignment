@@ -102,7 +102,7 @@ class CommandsCfg:
         rel_heading_envs=0.0,
         heading_command=False,
         ranges=UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.2, 0.2),   # sempre 0.5 m/s in avanti
+            lin_vel_x=(0.0, 0.0),   # CURRICULUM TRAINING:partire da poco e salire gradualmente
             lin_vel_y=(0.0, 0.0),   # no movimento laterale
             ang_vel_z=(0.0, 0.0),   # no rotazione
         ),
@@ -137,6 +137,9 @@ class ObservationsCfg:
         # Joint state
         joint_pos_rel = ObsTerm(func=joint_pos_rel)
         joint_vel_rel = ObsTerm(func=joint_vel_rel)
+
+        
+        
 
         # Last action (for smoothness reward)
         last_action = ObsTerm(func=last_action)
@@ -192,13 +195,6 @@ class RewardStabilityCfg:
     # Stay alive
     alive = RewTerm(func=is_alive, weight=0.15)
 
-    # Primary: walk forward at target velocity
-    forward_velocity = RewTerm(
-        func=track_lin_vel_xy_exp, 
-        weight=1.2,
-        params={"command_name": "base_velocity", "std": 0.25}, 
-        #prende la v_d dal comando per fare V_reale - V_desired e setta la standard deviation per exponential in track_lin_vel_xy_exp
-    )
 
     # Penalise vertical base velocity (no bouncing)
     lin_vel_z = RewTerm(
@@ -258,23 +254,58 @@ class RewardStabilityCfg:
     )
 
 
-
-
-
-
-
 @configclass
-class RewardsCfg:
-    """Reward terms for walking forward."""
+class RewardsCfg(RewardStabilityCfg):
+    
+    # # Primary walking reward EXPONENTIAL DA PROBLEMI SE ROBOT FERMO
+    # forward_velocity = RewTerm(
+    #     func=track_lin_vel_xy_exp,
+    #     weight=5.0,  # Aumentato
+    #     params={"command_name": "base_velocity", "std": 0.1},
+    # )
 
-    # Primary: walk forward at target velocity
     forward_velocity = RewTerm(
-        func=track_lin_vel_xy_exp, 
-        weight=1.2,
-        params={"command_name": "base_velocity", "std": 0.25}, 
-        #prende la v_d dal comando per fare V_reale - V_desired e setta la standard deviation per exponential in track_lin_vel_xy_exp
+        func=mdp.linear_velocity_reward,  # Usa la funzione corretta
+        weight=3.0,
+        params={"command_name": "base_velocity"},
     )
 
+    # Feet air time - usa versione migliorata
+    feet_air_time = RewTerm(
+        func=mdp.feet_air_time_reward,  # Usa la tua custom migliorata
+        weight=4.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces"),
+            "threshold": 0.15,  # Più basso per iniziare
+            "min_air_time": 0.05,
+        },
+    )
+    
+    # Contact alternation - esplicitamente
+    feet_alternation = RewTerm(
+        func=mdp.feet_contact_alternation,
+        weight=1.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces"),
+            "threshold": 0.5,
+            "smooth_transition": True,
+        },
+    )
+
+    #Simmetria della gambe
+    leg_symmetry = RewTerm(
+        func=mdp.leg_symmetry_reward,
+        weight=1.0,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    foot_flat = RewTerm(
+        func=mdp.foot_flat_standing_reward,
+        weight=1.5,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces"), "target_force": 20.0}
+    )
+    
+    # (Mantieni gli altri reward come prima)
 
 
     # # Min. torso ang. vel:  termine di regolarità/smoothness del torso

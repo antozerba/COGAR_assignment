@@ -102,4 +102,8 @@ cd /root/Documents/G1_controller/
 ``` bash
 /isaac-sim/python.sh scripts/rsl_rl/play.py --task Template-G1-Controller-v0 --load_run 2026-05-23_14-43-38 --num_envs 1
 ```
+- Tensorboard
+``` bash
+/isaac-sim/python.sh -m tensorboard.main --logdir=logs
+```
 
