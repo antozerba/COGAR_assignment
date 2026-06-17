@@ -220,7 +220,7 @@ class RewardsCfg:
     # Primary: walk forward at target velocity
     forward_velocity = RewTerm(
         func=track_lin_vel_xy_exp, 
-        weight=3.0,
+        weight=2.5,
         params={"command_name": "base_velocity", "std": 0.25}, 
     )
 
@@ -250,12 +250,12 @@ class RewardsCfg:
         weight=-0.5,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
-    # # Avoid body turning and force walk straight (tried after 1000 but makes the robot moves only one leg forward )
-    # ang_vel_yaw = RewTerm(
-    #     func=mdp.ang_vel_z_l2, 
-    #     weight=-1.0,  # Aumentato da -0.5 a -2.0
-    #     params={"asset_cfg": SceneEntityCfg("robot")},
-    # )
+    # Avoid body turning and force walk straight (tried after 1000 but makes the robot moves only one leg forward )
+    ang_vel_yaw = RewTerm(
+        func=mdp.ang_vel_z_l2, 
+        weight=-1.0,  # Aumentato da -0.5 a -2.0
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
 
     #------------------------
 
@@ -312,6 +312,23 @@ class RewardsCfg:
             )
         },
     )
+    #Evitare ancora farfallio
+    joint_vel_arms_penalty = RewTerm(
+        func=mdp.joint_vel_l1, # Oppure joint_vel_l2 (al quadrato è più fluido)
+        weight=-0.01,         # Inizia basso, alza se sono ancora troppo agitate
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    ".*_shoulder_pitch_joint",
+                    ".*_shoulder_roll_joint",
+                    ".*_shoulder_yaw_joint",
+                    ".*_elbow_pitch_joint",
+                    ".*_elbow_roll_joint"
+                ]
+            )
+        },
+    )
     # Regalizzazione per mantenere il busto (waist) vicino alla posizione eretta, ma con peso molto basso per non interferire troppo con i movimenti naturali del G1
     joint_pos_waist = RewTerm(
         func=mdp.joint_pos_target_l2,
@@ -347,13 +364,8 @@ class RewardsCfg:
         },
     )
 
-
-
-
-
-    
     # Smooth actions
-    action_rate = RewTerm(func=action_rate_l2, weight=-0.01)
+    action_rate = RewTerm(func=action_rate_l2, weight=-0.05)
 
 
 @configclass

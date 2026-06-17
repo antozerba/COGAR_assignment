@@ -440,7 +440,7 @@ class TerminationsCfg:
 
 
 @configclass
-class G1_23dof_ControllerEnvCfg(ManagerBasedRLEnvCfg):
+class G1_gait_ControllerEnvCfg(ManagerBasedRLEnvCfg):
     """Full environment configuration for G1 forward locomotion."""
 
     scene: G1ControllerSceneCfg = G1ControllerSceneCfg(num_envs=4096, env_spacing=2.5)
