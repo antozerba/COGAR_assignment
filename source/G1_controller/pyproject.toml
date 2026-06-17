@@ -6,5 +6,11 @@ build-backend = "setuptools.build_meta"
 pythonPath = "/isaac-sim/kit/python/bin/python3"
 extraPaths = [
     "./source/G1_controller",
-    "/isaac-sim/kit/python/lib/python3.11/site-packages"
+    "/isaac-sim/kit/python/lib/python3.11/site-packages",
+    # AGGIUNGI QUESTI PERCORSI:
+    "/root/IsaacLab/source",
+    "/root/IsaacLab/source/isaaclab",
+    "/root/IsaacLab/source/isaaclab_tasks",
+    "/root/IsaacLab/source/isaaclab_assets",
+    "/root/IsaacLab/source/isaaclab_rl"
 ]

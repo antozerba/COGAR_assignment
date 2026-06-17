@@ -76,6 +76,8 @@ class G1ControllerSceneCfg(InteractiveSceneCfg):
     )
 
     # G1 robot
+
+    
     robot: ArticulationCfg = G1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # Contact sensors on feet
@@ -102,7 +104,7 @@ class CommandsCfg:
         rel_heading_envs=0.0,
         heading_command=False,
         ranges=UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.0, 0.0),   # CURRICULUM TRAINING:partire da poco e salire gradualmente
+            lin_vel_x=(0.0, 0.0),   # CURRICULUM TRAINING:partire da poco e salire gradualmente, zero for stablity
             lin_vel_y=(0.0, 0.0),   # no movimento laterale
             ang_vel_z=(0.0, 0.0),   # no rotazione
         ),
@@ -138,8 +140,6 @@ class ObservationsCfg:
         joint_pos_rel = ObsTerm(func=joint_pos_rel)
         joint_vel_rel = ObsTerm(func=joint_vel_rel)
 
-        
-        
 
         # Last action (for smoothness reward)
         last_action = ObsTerm(func=last_action)
@@ -195,24 +195,38 @@ class RewardStabilityCfg:
     # Stay alive
     alive = RewTerm(func=is_alive, weight=0.15)
 
+    # STANDING TRACKING: Premia il robot se la velocità reale è esattamente 0.0
+    forward_velocity = RewTerm(
+        func=track_lin_vel_xy_exp, 
+        weight=1.5,
+        params={"command_name": "base_velocity", "std": 0.25}, # Poiché v_d=(0,0), premia l'immobilità lineare
+    )
+
 
     # Penalise vertical base velocity (no bouncing)
     lin_vel_z = RewTerm(
         func=lin_vel_z_l2,
-        weight=-2.0,
+        weight=-1.0,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
     # HORIZOTNAL ANG VEL Penalise rolling/pitching of the base, keep the robot up right
     ang_vel_xy = RewTerm(
         func=ang_vel_xy_l2,
-        weight=-0.05,
+        weight=-1.5,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    # HIP-pose DEVATION , to avoid waist rotation
+    ang_vel_z = RewTerm(
+        func=mdp.ang_vel_z_l2,
+        weight=-1.0,    
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     # ORIENTATION DEVIATION Keep torso upright, torso inclination 
     flat_orientation = RewTerm(
         func=flat_orientation_l2,
-        weight=-1.0,
+        weight=-3.0,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
@@ -234,21 +248,35 @@ class RewardStabilityCfg:
     )
 
 
-    # HIP-pose DEVATION , to avoid waist rotation
-    ang_vel_z = RewTerm(
-        func=mdp.ang_vel_z_l2,
-        weight=-1.0,    
-        params={"asset_cfg": SceneEntityCfg("robot")},
+
+    # # Tieni braccia ferme
+    # joint_pos_arms = RewTerm(
+    #     func=mdp.joint_pos_target_l2,
+    #     weight=-1.0,
+    #     params={
+    #         "asset_cfg": SceneEntityCfg(
+    #             "robot",
+    #             joint_names=[".*_shoulder_.*", ".*_elbow.*"]
+    #         )
+    #     },
+    # )
+
+    joint_pos_hip_roll = RewTerm(
+        func=mdp.joint_pos_target_l2,
+        weight=-1.5, 
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_roll_joint"])
+        },
     )
 
-    # Tieni braccia ferme
-    joint_pos_arms = RewTerm(
+    # Evita che le gambe ruotino verso l'interno incrociandosi
+    joint_pos_hip_yaw = RewTerm(
         func=mdp.joint_pos_target_l2,
-        weight=-0.5,
+        weight=-1.5, 
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
-                joint_names=[".*_shoulder_.*", ".*_elbow.*"]
+                joint_names=[".*_hip_yaw_joint"]
             )
         },
     )

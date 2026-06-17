@@ -67,42 +67,83 @@ def ang_vel_z_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Ten
 #     # Sum over feet [num_envs]
 #     return reward.sum(dim=-1)
 
-
 def feet_air_time_reward(
     env: ManagerBasedRLEnv, 
     sensor_cfg: SceneEntityCfg, 
-    threshold: float = 0.2,  # Ridotto da 0.4 per iniziare prima
-    min_air_time: float = 0.05,  # Minimo per considerare "buon" air time
+    threshold: float = 0.2,       # Soglia target ideale di volo (es. 0.2 secondi)
+    min_air_time: float = 0.05,   # Minimo per considerare il piede sollevato
 ) -> torch.Tensor:
-    """
-    Reward foot air time during walking.
+    """Reward foot air time during walking, balancing landing impact and continuous flight."""
     
-    Versione migliorata: premia PROPORZIONALMENTE all'air time,
-    non solo quando supera la soglia.
-    """
+    # 1. Recupera il sensore tramite il manager della scena
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     
-    # Air time since last contact for each foot [num_envs, num_feet]
-    air_time = contact_sensor.data.last_air_time
+    # 2. Ottieni lo stato di contatto (True se la forza verticale Z > 1.0 Newton)
+    # contact_sensor.data.net_forces_w ha shape [num_envs, num_bodies, 3]
+    # Selezioniamo tutte le env, tutti i corpi (i 2 piedi) e l'asse Z (indice 2)
+    foot_forces = contact_sensor.data.net_forces_w[:, :, 2]
+    in_contact = foot_forces > 1.0
     
-    # Contact state - True if foot is on ground
-    in_contact = contact_sensor.data.net_forces_w_history[:, 0, :, 2] > 1.0
+    # 3. Ottieni il tempo di volo corrente accumulato da ciascun piede
+    current_air_time = contact_sensor.data.current_air_time
     
-    # REWARD 1: When foot lands after good air time (original logic)
-    landing_bonus = torch.clamp(air_time - threshold, min=0.0) * in_contact.float()
+    # REWARD 1: Landing Bonus (Logica classica del paper)
+    # Premia quando il piede tocca terra (in_contact) dopo essere rimasto in volo oltre la soglia
+    # Usiamo 'last_air_time' che si congela all'istante dell'impatto per premiare il landing
+    last_air_time = contact_sensor.data.last_air_time
+    landing_bonus = torch.clamp(last_air_time - threshold, min=0.0) * in_contact.float()
     
-    # REWARD 2: Continuous air time reward (NUOVO - per incentivare a sollevare)
-    # Premia gradualmente l'aria time, non solo all'atterraggio
-    air_time_bonus = torch.clamp(air_time - min_air_time, min=0.0) * (~in_contact).float()
-    air_time_bonus = air_time_bonus * 0.5  # Peso ridotto rispetto al landing
+    # REWARD 2: Continuous Flight Bonus (La tua ottima intuizione)
+    # Premia ad ogni step in cui il piede è in aria (~in_contact) per incentivare il movimento di swing
+    air_time_bonus = torch.clamp(current_air_time - min_air_time, min=0.0) * (~in_contact).float()
+    air_time_bonus = air_time_bonus * 0.5  # Peso ridotto per non destabilizzare lo swing
     
-    # REWARD 3: Bonus per alternanza (integra con l'altra funzione)
-    alternation_bonus = feet_contact_alternation(env, sensor_cfg, threshold=1.0)
+    # REWARD 3: Integrazione Alternanza (Prende la funzione mdp locale)
+    # Passiamo la soglia corretta per il sensore
+    alternation_bonus = feet_contact_alternation(env, sensor_cfg, threshold=0.5)
     
-    # Combine rewards
+    # Somma sui piedi (dim=-1) e combina i termini
     total_reward = landing_bonus.sum(dim=-1) + air_time_bonus.sum(dim=-1) + alternation_bonus * 0.3
     
     return total_reward
+
+def feet_drag_penalty(
+    env: ManagerBasedRLEnv, 
+    asset_cfg: SceneEntityCfg,
+    sensor_cfg: SceneEntityCfg, 
+) -> torch.Tensor:
+    """Penalizza il trascinamento dei piedi sul terreno (alta velocità orizzontale durante il contatto)."""
+    
+    # 1. Recupera l'asset del robot e il sensore di contatto
+    robot: Articulation = env.scene[asset_cfg.name]
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    
+    # 2. Ottieni la velocità lineare dei corpi associati ai piedi
+    # body_names deve coincidere con i link dei piedi configurati in SceneEntityCfg
+    # robot.data.body_lin_vel_w ha shape [num_envs, num_bodies, 6] (i primi 3 sono lin_vel, gli altri 3 ang_vel)
+    # Isaac Lab espone body_lin_vel_w per le velocità lineari [num_envs, num_bodies, 3]
+    
+    # Estraiamo gli indici dei corpi dei piedi nella cinematica del robot
+    foot_body_ids = asset_cfg.body_ids
+    feet_vel_w = robot.data.body_lin_vel_w[:, foot_body_ids, :2] # Prendiamo solo gli assi X e Y (:2)
+    
+    # Calcoliamo la norma della velocità orizzontale (quanto velocemente slitta il piede)
+    feet_speed_xy = torch.norm(feet_vel_w, dim=-1) # shape: [num_envs, num_feet]
+    
+    # 3. Identifica se il piede è a contatto con il terreno (forza Z > 1.0N)
+    foot_forces = contact_sensor.data.net_forces_w[:, :, 2]
+    in_contact = (foot_forces > 1.0).float()
+    
+    # 4. Calcola la penalità: Velocità_XY * In_Contatto
+    # Più il piede striscia velocemente mentre è a terra, più la penalità sale
+    drag_penalty = (feet_speed_xy ** 2) * in_contact
+    
+    # Somma il contributo di entrambi i piedi e restituisci il valore negativo (essendo una penalità)
+    # Nota: In Isaac Lab restituiamo il valore positivo del calcolo poiché il segno '-' 
+    # viene applicato automaticamente dal 'weight=-0.5' dentro la classe RewardsCfg.
+    return drag_penalty.sum(dim=-1)
+
+
 
 
 def feet_contact_alternation(
