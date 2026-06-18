@@ -131,6 +131,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # set the log directory for the environment (works for all environment types)
     env_cfg.log_dir = log_dir
+    print("LOG:" + log_dir)
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
@@ -198,7 +199,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # reset environment
     obs = env.get_observations()
     timestep = 0
-    # simulate environment
+    # simulate environme
+
+    import numpy as np
+
     while simulation_app.is_running():
         start_time = time.time()
         # run everything in inference mode
@@ -207,6 +211,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             actions = policy(obs)
             # env stepping
             obs, _, dones, _ = env.step(actions)
+
+            # 1. Recupera la posizione del robot
+            root_state = env.unwrapped.scene["robot"].data.root_state_w
+            robot_pos = root_state[0, 0:3].cpu().numpy()
+
+            # 2. Imposta la telecamera usando l'API di Isaac Lab
+            # Questa funzione è nativa nell'interfaccia di visualizzazione di Isaac Lab
+            env.unwrapped.sim.set_camera_view(
+                eye=robot_pos + np.array([2.0, 3.0, 1.5]),
+                target=robot_pos
+            )
+
             # reset recurrent states for episodes that have terminated
             if version.parse(installed_version) >= version.parse("4.0.0"):
                 policy.reset(dones)

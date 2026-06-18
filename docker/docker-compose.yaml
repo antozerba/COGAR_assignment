@@ -1,0 +1,37 @@
+version: '3.8'
+services:
+  isaac-sim:
+    #image: nvcr.io/nvidia/isaac-sim:5.1.0
+    #container_name: isaac-sim-container
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: isaac-sim-container
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - ACCEPT_EULA=Y
+      - PRIVACY_CONSENT=Y
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/root/.Xauthority
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - OMNI_KIT_ALLOW_ROOT=1
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /home/${USER}/.Xauthority:/root/.Xauthority:rw
+      - ~/docker/isaac-sim/cache:/root/.cache:rw
+      - ~/docker/isaac-sim/data:/root/.local/share/isaac-sim:rw
+      - ~/docker/isaac-sim/documents:/root/Documents:rw
+      - /usr/share/vulkan/icd.d/nvidia_icd.json:/usr/share/vulkan/icd.d/nvidia_icd.json:ro
+    network_mode: host
+    ipc: host
+    restart: "no"
+    stdin_open: true
+    tty: true
+    entrypoint: /bin/bash

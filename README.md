@@ -1,135 +1,116 @@
-# Template for Isaac Lab Projects
+# G1 Humanoid Controller — Isaac Lab
 
-## Overview
+Isaac Lab extension that trains a bipedal walking/standing controller for the Unitree G1 (29-DOF) humanoid using PPO (RSL-RL).
 
-This project/repository serves as a template for building projects or extensions based on Isaac Lab.
-It allows you to develop in an isolated environment, outside of the core Isaac Lab repository.
 
-**Key Features:**
+!
 
-- `Isolation` Work outside the core Isaac Lab repository, ensuring that your development efforts remain self-contained.
-- `Flexibility` This template is set up to allow your code to be run as an extension in Omniverse.
+## Available tasks
 
-**Keywords:** extension, template, isaaclab
+| Task ID | Description |
+|---|---|
+| `Template-G1_29dof-Controller-v0` | Full 29-DOF G1, forward walking, target velocity 0.4 m/s on x, self-collisions enabled. |
+| `Template-G1_gait-Controller-v0` | Standing/balance task, velocity command fixed at 0 (used to learn stability before walking). |
+
+## Project structure
+
+```
+source/G1_controller/
+└── G1_controller/
+    └── tasks/manager_based/g1_controller/
+        ├── g1_29dof_env_cfg.py   # walking env: scene, rewards, terminations
+        ├── g1_gait_env_cfg.py    # standing/stability env
+        ├── robots/usd_cfg.py     # G1 articulation/actuator config
+        ├── agents/rsl_rl_ppo_cfg.py  # PPO hyperparameters
+        └── mdp/rewards.py        # custom reward functions
+scripts/
+├── list_envs.py        # list registered tasks
+├── zero_agent.py        # sanity check: zero actions
+├── random_agent.py      # sanity check: random actions
+└── rsl_rl/
+    ├── train.py
+    ├── play.py
+    └── cli_args.py
+```
+
+## Docker setup
+
+The `docker/Dockerfile` builds on `nvcr.io/nvidia/isaac-sim:5.1.0` and bakes Isaac Lab (`isaaclab`, `isaaclab_assets`, `isaaclab_tasks`, `isaaclab_rl`) into the image. `docker-compose.yml` (in `docker/`) builds that image and mounts `~/docker/isaac-sim/documents` to `/root/Documents`.
+
+1. **Get Isaac Lab source** (build-time dependency, copied into the image):
+   ```bash
+   git clone https://github.com/isaac-sim/IsaacLab.git docker/IsaacLab
+   ```
+2. **Place this project where the volume mounts it**, so it's visible inside the container:
+   ```bash
+   mkdir -p ~/docker/isaac-sim/documents
+   mv /path/to/G1_controller ~/docker/isaac-sim/documents/G1_controller
+   ```
+3. **Build and start the container**:
+   ```bash
+   cd ~/docker/isaac-sim/documents/G1_controller/docker
+   docker compose up -d --build
+   ```
+4. **Enter the container** and go to the project (mounted at `/root/Documents`):
+   ```bash
+   docker exec -it isaac-sim-container bash
+   cd /root/Documents/G1_controller
+   ```
+
+All commands below run **inside the container**, from this path. (GUI rendering needs X11 on the host: `xhost +local:` before step 3 if you hit display errors.)
 
 ## Installation
 
-- Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
-  We recommend using the conda or uv installation as it simplifies calling Python scripts from the terminal.
+Isaac Lab core packages are already installed in the image. Only this project's extension needs installing:
+```bash
+/isaac-sim/python.sh -m pip install -e source/G1_controller
+```
+Verify installation:
+```bash
+/isaac-sim/python.sh scripts/list_envs.py
+```
+(Optional) sanity-check an env before training:
+```bash
+/isaac-sim/python.sh scripts/zero_agent.py --task Template-G1_29dof-Controller-v0
+/isaac-sim/python.sh scripts/random_agent.py --task Template-G1_29dof-Controller-v0
+```
 
-- Clone or copy this project/repository separately from the Isaac Lab installation (i.e. outside the `IsaacLab` directory):
-
-- Using a python interpreter that has Isaac Lab installed, install the library in editable mode using:
-
-    ```bash
-    # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-    python -m pip install -e source/G1_controller
-
-- Verify that the extension is correctly installed by:
-
-    - Listing the available tasks:
-
-        Note: It the task name changes, it may be necessary to update the search pattern `"Template-"`
-        (in the `scripts/list_envs.py` file) so that it can be listed.
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/list_envs.py
-        ```
-
-    - Running a task:
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/<RL_LIBRARY>/train.py --task=<TASK_NAME>
-        ```
-
-    - Running a task with dummy agents:
-
-        These include dummy agents that output zero or random agents. They are useful to ensure that the environments are configured correctly.
-
-        - Zero-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/zero_agent.py --task=<TASK_NAME>
-            ```
-        - Random-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/random_agent.py --task=<TASK_NAME>
-            ```
-
-### Set up IDE (Optional)
-
-To setup the IDE, please follow these instructions:
-
-- Run VSCode Tasks, by pressing `Ctrl+Shift+P`, selecting `Tasks: Run Task` and running the `setup_python_env` in the drop down menu.
-  When running this task, you will be prompted to add the absolute path to your Isaac Sim installation.
-
-If everything executes correctly, it should create a file .python.env in the `.vscode` directory.
-The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse.
-This helps in indexing all the python modules for intelligent suggestions while writing code.
-
-### Setup as Omniverse Extension (Optional)
-
-We provide an example UI extension that will load upon enabling your extension defined in `source/G1_controller/G1_controller/ui_extension_example.py`.
-
-To enable your extension, follow these steps:
-
-1. **Add the search path of this project/repository** to the extension manager:
-    - Navigate to the extension manager using `Window` -> `Extensions`.
-    - Click on the **Hamburger Icon**, then go to `Settings`.
-    - In the `Extension Search Paths`, enter the absolute path to the `source` directory of this project/repository.
-    - If not already present, in the `Extension Search Paths`, enter the path that leads to Isaac Lab's extension directory directory (`IsaacLab/source`)
-    - Click on the **Hamburger Icon**, then click `Refresh`.
-
-2. **Search and enable your extension**:
-    - Find your extension under the `Third Party` category.
-    - Toggle it to enable your extension.
-
-## Code formatting
-
-We have a pre-commit template to automatically format your code.
-To install pre-commit:
+## Training
 
 ```bash
-pip install pre-commit
+# start training
+/isaac-sim/python.sh scripts/rsl_rl/train.py --task Template-G1_29dof-Controller-v0
+
+# resume / extend a previous run
+/isaac-sim/python.sh scripts/rsl_rl/train.py --task Template-G1_29dof-Controller-v0 --resume --max_iterations 500
 ```
 
-Then you can run pre-commit with:
+Replace the task with `Template-G1_gait-Controller-v0` to train the standing/balance policy instead.
+
+PPO settings (network size, learning rate, iterations, etc.) are defined in `agents/rsl_rl_ppo_cfg.py`. Logs are written to `logs/rsl_rl/<experiment_name>/<run_id>/`.
+
+Monitor training:
+```bash
+/isaac-sim/python.sh -m tensorboard.main --logdir=logs
+```
+
+## Using a trained policy
 
 ```bash
-pre-commit run --all-files
+/isaac-sim/python.sh scripts/rsl_rl/play.py \
+    --task Template-G1_29dof-Controller-v0 \
+    --load_run <run_id_folder> \
+    --num_envs 1
 ```
 
-## Troubleshooting
+`--load_run` is the timestamped folder name under `logs/rsl_rl/<experiment_name>/` (omit it to load the most recent run). `play.py` also exports the policy to `policy.pt` (JIT) and `policy.onnx` for deployment outside Isaac Lab.
 
-### Pylance Missing Indexing of Extensions
+## Reward design (summary)
 
-In some VsCode versions, the indexing of part of the extensions is missing.
-In this case, add the path to your extension in `.vscode/settings.json` under the key `"python.analysis.extraPaths"`.
+Rewards/penalties are implemented in `mdp/rewards.py` and combined per-task in the `*_env_cfg.py` files:
+- **Task reward**: velocity tracking (`forward_velocity`) and an alive bonus.
+- **Stability**: penalties on vertical/angular base velocity, orientation tilt, and base height deviation.
+- **Gait quality**: foot air-time, contact alternation, foot-flat/landing, and leg-symmetry rewards.
+- **Regularization**: joint velocity/torque penalties and action-rate smoothing to avoid jittery motion.
 
-```json
-{
-    "python.analysis.extraPaths": [
-        "<path-to-ext-repo>/source/G1_controller"
-    ]
-}
-```
-
-### Pylance Crash
-
-If you encounter a crash in `pylance`, it is probable that too many files are indexed and you run out of memory.
-A possible solution is to exclude some of omniverse packages that are not used in your project.
-To do so, modify `.vscode/settings.json` and comment out packages under the key `"python.analysis.extraPaths"`
-Some examples of packages that can likely be excluded are:
-
-```json
-"<path-to-isaac-sim>/extscache/omni.anim.*"         // Animation packages
-"<path-to-isaac-sim>/extscache/omni.kit.*"          // Kit UI tools
-"<path-to-isaac-sim>/extscache/omni.graph.*"        // Graph UI tools
-"<path-to-isaac-sim>/extscache/omni.services.*"     // Services tools
-...
-```
+Termination conditions: episode timeout, excessive base tilt, and base height below a minimum threshold.
