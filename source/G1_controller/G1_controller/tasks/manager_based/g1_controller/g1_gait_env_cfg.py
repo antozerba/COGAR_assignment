@@ -104,9 +104,9 @@ class CommandsCfg:
         rel_heading_envs=0.0,
         heading_command=False,
         ranges=UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.0, 0.0),   # CURRICULUM TRAINING:partire da poco e salire gradualmente, zero for stablity
-            lin_vel_y=(0.0, 0.0),   # no movimento laterale
-            ang_vel_z=(0.0, 0.0),   # no rotazione
+            lin_vel_x=(0.0, 0.0),   #starting from zero for stablity (Curriculum Training)
+            lin_vel_y=(0.0, 0.0),   
+            ang_vel_z=(0.0, 0.0),   
         ),
     )
 
@@ -195,7 +195,6 @@ class RewardStabilityCfg:
     # Stay alive
     alive = RewTerm(func=is_alive, weight=0.15)
 
-    # STANDING TRACKING: Premia il robot se la velocità reale è esattamente 0.0
     forward_velocity = RewTerm(
         func=track_lin_vel_xy_exp, 
         weight=1.5,
@@ -285,12 +284,6 @@ class RewardStabilityCfg:
 @configclass
 class RewardsCfg(RewardStabilityCfg):
     
-    # # Primary walking reward EXPONENTIAL DA PROBLEMI SE ROBOT FERMO
-    # forward_velocity = RewTerm(
-    #     func=track_lin_vel_xy_exp,
-    #     weight=5.0,  # Aumentato
-    #     params={"command_name": "base_velocity", "std": 0.1},
-    # )
 
     forward_velocity = RewTerm(
         func=mdp.linear_velocity_reward,  # Usa la funzione corretta
@@ -333,7 +326,6 @@ class RewardsCfg(RewardStabilityCfg):
         params={"sensor_cfg": SceneEntityCfg("contact_forces"), "target_force": 20.0}
     )
     
-    # (Mantieni gli altri reward come prima)
 
 
     # # Min. torso ang. vel:  termine di regolarità/smoothness del torso

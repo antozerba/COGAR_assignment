@@ -43,7 +43,6 @@ from isaaclab.envs.mdp import (
     reset_joints_by_offset,
     # rewards
     is_alive,
-    # is_terminated,  <-- Nota: In Isaac Lab si usa spesso 'is_terminated_thin' o penalità dirette
     lin_vel_z_l2,
     ang_vel_xy_l2,
     flat_orientation_l2,
@@ -82,10 +81,6 @@ class G1ControllerSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
     )
 
-    # # G1 robot
-    # robot: ArticulationCfg = G1_CFG.replace(
-    #     prim_path="{ENV_REGEX_NS}/Robot",
-    # ) 
 
     robot: ArticulationCfg = G1_CFG.replace(
       prim_path="{ENV_REGEX_NS}/Robot",
@@ -135,9 +130,8 @@ class ActionsCfg:
 
     joint_pos = JointPositionActionCfg(
         asset_name="robot",
-        # Corretto: includiamo TUTTI i giunti per mappare il modello 29DOF di MuJoCo
         joint_names=[".*"], 
-        scale = 0.25, # Ridotto a 0.25 per evitare movimenti troppo bruschi (soprattutto con il modello 29DOF)
+        scale = 0.25, 
         use_default_offset=True,
     )
 

@@ -3,35 +3,62 @@
 Isaac Lab extension that trains a bipedal walking/standing controller for the Unitree G1 (29-DOF) humanoid using PPO (RSL-RL).
 
 
-!
-
 ## Available tasks
 
 | Task ID | Description |
 |---|---|
-| `Template-G1_29dof-Controller-v0` | Full 29-DOF G1, forward walking, target velocity 0.4 m/s on x, self-collisions enabled. |
-| `Template-G1_gait-Controller-v0` | Standing/balance task, velocity command fixed at 0 (used to learn stability before walking). |
+| `Template-G1_29dof-Controller-v0` | Full 29-DOF G1, forward walking, self-collisions enabled. |
+| `Template-G1_gait-Controller-v0` | Full 29-DOF G1, Gai shift implementation, different phases (standing-walking-running) |
+| `Template-G1_mujoco-Controller-v0` | Full 29-DOF G1, all directions locomotive task based on mujoco weights |
 
 ## Project structure
 
+Below is the directory layout of the `G1_controller` repository along with a brief description of each component:
+
+```text
+.
+├── docker/                      # Containerization configuration files
+│   ├── Dockerfile               # Recipes to build the controller's Docker image
+│   └── docker-compose.yaml      # Multi-container orchestration (e.g., managing simulation/headless runs)
+├── logs/                        # Training logs, checkpoints, and evaluation metrics
+│   └── rsl_rl/                  
+│       ├── G1_29dof_controller_ppo/   
+│       ├── G1_gait_controller_ppo/    
+│       └── G1_mujoco_controller_ppo/  
+│           └── <timestamp>/     # Individual training sessions containing:
+│               ├── events.out.* # TensorBoard event logs for training visualization
+│               ├── exported/    # Final deployment-ready formats (policy.pt, policy.onnx)
+│               ├── params/      # Configuration snapshots (agent.yaml, env.yaml) used for that run
+│               └── videos/      
+├── scripts/                     # Executable scripts to run, train, or test the framework
+│   ├── list_envs.py             
+│   ├── random_agent.py          
+│   ├── zero_agent.py            
+│   └── rsl_rl/                  
+│       ├── cli_args.py          
+│       ├── train.py             # Main entrypoint to start reinforcement learning (PPO) training
+│       └── play.py              # Script to visualize and evaluate trained checkpoints
+├── source/                      
+│   └── G1_controller/           
+│       ├── config/              # Simulator integration configurations (e.g., Omniverse Isaac extension)
+│       ├── docs/                # Project local documentation and changelogs
+│       └── G1_controller/       # Environment logic, tasks, and state machine configurations
+│           ├── tasks/           
+│           │   └── manager_based/
+│           │       └── g1_controller/
+│           │           ├── agents/         # PPO Hyperparameters configuration 
+│           │           ├── mdp/            # Markov Decision Process functions 
+│           │           ├── robots/         # Robot-specific USD and mesh asset loaders
+│           │           ├── g1_29dof_env_cfg.py   
+│           │           ├── g1_gait_env_cfg.py    
+│           │           └── g1_mujoco_env_cfg.py  
+│           └── ui_extension_example.py 
+├── pyproject.toml               
+├── setup.py                     
+└── README.md                    
+
 ```
-source/G1_controller/
-└── G1_controller/
-    └── tasks/manager_based/g1_controller/
-        ├── g1_29dof_env_cfg.py   # walking env: scene, rewards, terminations
-        ├── g1_gait_env_cfg.py    # standing/stability env
-        ├── robots/usd_cfg.py     # G1 articulation/actuator config
-        ├── agents/rsl_rl_ppo_cfg.py  # PPO hyperparameters
-        └── mdp/rewards.py        # custom reward functions
-scripts/
-├── list_envs.py        # list registered tasks
-├── zero_agent.py        # sanity check: zero actions
-├── random_agent.py      # sanity check: random actions
-└── rsl_rl/
-    ├── train.py
-    ├── play.py
-    └── cli_args.py
-```
+
 
 ## Docker setup
 
@@ -49,7 +76,7 @@ The `docker/Dockerfile` builds on `nvcr.io/nvidia/isaac-sim:5.1.0` and bakes Isa
 3. **Build and start the container**:
    ```bash
    cd ~/docker/isaac-sim/documents/G1_controller/docker
-   docker compose up -d --build
+   docker compose up -d 
    ```
 4. **Enter the container** and go to the project (mounted at `/root/Documents`):
    ```bash
@@ -69,11 +96,6 @@ Verify installation:
 ```bash
 /isaac-sim/python.sh scripts/list_envs.py
 ```
-(Optional) sanity-check an env before training:
-```bash
-/isaac-sim/python.sh scripts/zero_agent.py --task Template-G1_29dof-Controller-v0
-/isaac-sim/python.sh scripts/random_agent.py --task Template-G1_29dof-Controller-v0
-```
 
 ## Training
 
@@ -85,9 +107,10 @@ Verify installation:
 /isaac-sim/python.sh scripts/rsl_rl/train.py --task Template-G1_29dof-Controller-v0 --resume --max_iterations 500
 ```
 
-Replace the task with `Template-G1_gait-Controller-v0` to train the standing/balance policy instead.
+Replace the task with `Template-G1_mujoco-Controller-v0` to train for every directions.
 
-PPO settings (network size, learning rate, iterations, etc.) are defined in `agents/rsl_rl_ppo_cfg.py`. Logs are written to `logs/rsl_rl/<experiment_name>/<run_id>/`.
+PPO settings (network size, learning rate, iterations, etc.) are defined in `agents/rsl_rl_ppo_cfg.py`. 
+Logs are written to `logs/rsl_rl/<experiment_name>/<run_id>/`.
 
 Monitor training:
 ```bash
@@ -95,6 +118,7 @@ Monitor training:
 ```
 
 ## Using a trained policy
+
 
 ```bash
 /isaac-sim/python.sh scripts/rsl_rl/play.py \
@@ -105,12 +129,11 @@ Monitor training:
 
 `--load_run` is the timestamped folder name under `logs/rsl_rl/<experiment_name>/` (omit it to load the most recent run). `play.py` also exports the policy to `policy.pt` (JIT) and `policy.onnx` for deployment outside Isaac Lab.
 
-## Reward design (summary)
+Example:
+``` bash
+/isaac-sim/python.sh scpts/rsl_rl/play.py     --task Template-G1_mujoco-Controller-v0     --load_run 2026-06-21_17-28-35
+```
 
-Rewards/penalties are implemented in `mdp/rewards.py` and combined per-task in the `*_env_cfg.py` files:
-- **Task reward**: velocity tracking (`forward_velocity`) and an alive bonus.
-- **Stability**: penalties on vertical/angular base velocity, orientation tilt, and base height deviation.
-- **Gait quality**: foot air-time, contact alternation, foot-flat/landing, and leg-symmetry rewards.
-- **Regularization**: joint velocity/torque penalties and action-rate smoothing to avoid jittery motion.
-
-Termination conditions: episode timeout, excessive base tilt, and base height below a minimum threshold.
+### TroubleShooting
+- Before running the command make sure to allow X11 access to docker wiht `xhost +` outsidde the container
+- Every time you want to visualize the play.py of a different task make sure to change the correct `experiment_name =""`  in the `agents/rsl_rl_ppo_cfg.py` script.
