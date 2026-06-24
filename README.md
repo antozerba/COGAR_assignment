@@ -131,9 +131,20 @@ Monitor training:
 
 Example:
 ``` bash
-/isaac-sim/python.sh scpts/rsl_rl/play.py     --task Template-G1_mujoco-Controller-v0     --load_run 2026-06-21_17-28-35
+/isaac-sim/python.sh scripts/rsl_rl/play.py \
+    --task Template-G1_mujoco-Controller-v0 \
+    --load_run 2026-06-21_17-28-35 \
+    --video \
+    --video_length 500 \
+    --num_envs 1
 ```
+
+```bash
+
+```
+
 
 ### TroubleShooting
 - Before running the command make sure to allow X11 access to docker wiht `xhost +` outsidde the container
 - Every time you want to visualize the play.py of a different task make sure to change the correct `experiment_name =""`  in the `agents/rsl_rl_ppo_cfg.py` script.
+- In order to change the input velociy command,  in the env configuration file change the var `lin_vel_x=(0.5, 0.5)` in the `CommandsCfgPlay` class in mujoco_env
