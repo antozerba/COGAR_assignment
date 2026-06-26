@@ -13,9 +13,9 @@ class PPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 16
     max_iterations = 500
     save_interval = 50
-    experiment_name = "G1_gait_controller_ppo"
+    # experiment_name = "G1_gait_controller_ppo"
     # experiment_name = "G1_29dof_controller_ppo"
-    # experiment_name = "G1_mujoco_controller_ppo"
+    experiment_name = "G1_mujoco_controller_ppo"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_obs_normalization=False,

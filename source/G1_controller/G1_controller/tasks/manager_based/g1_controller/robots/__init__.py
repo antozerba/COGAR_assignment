@@ -1,1 +1,1 @@
-from .usd_cfg import G1_29DOF_CFG
+from .usd_cfg import *

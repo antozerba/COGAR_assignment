@@ -139,10 +139,6 @@ Example:
     --num_envs 1
 ```
 
-```bash
-
-```
-
 
 ### TroubleShooting
 - Before running the command make sure to allow X11 access to docker wiht `xhost +` outsidde the container

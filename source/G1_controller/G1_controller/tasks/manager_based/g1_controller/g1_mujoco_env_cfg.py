@@ -82,11 +82,6 @@ class G1ControllerSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
     )
 
-    # # G1 robot
-    # robot: ArticulationCfg = G1_CFG.replace(
-    #     prim_path="{ENV_REGEX_NS}/Robot",
-    # ) 
-
     robot: ArticulationCfg = G1_CFG.replace(
       prim_path="{ENV_REGEX_NS}/Robot",
       spawn=G1_CFG.spawn.replace(
